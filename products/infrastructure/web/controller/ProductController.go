@@ -31,3 +31,17 @@ func GetProductsByProviderName(getProductsByProviderName usecase.GetProductsByPr
 		return ctx.JSON(response)
 	}
 }
+
+func CreateProduct(createProductUseCase usecase.CreateProduct) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		p := new(model.CreateProductRequest)
+		err := ctx.BodyParser(p)
+		if err != nil {
+			return err
+		}
+
+		createProductUseCase.Execute(p.ToProduct())
+
+		return ctx.SendStatus(fiber.StatusCreated)
+	}
+}
