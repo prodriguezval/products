@@ -8,7 +8,10 @@ import (
 
 func GetProducts(getAllProducts usecase.GetAllProductsUseCase) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
-		products := getAllProducts.Execute()
+		products, err := getAllProducts.Execute()
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Message)
+		}
 		var response []model.ProductResponse
 		for _, product := range products {
 			productResponse := model.ProductResponse{}
@@ -22,7 +25,10 @@ func GetProductsByProviderName(getProductsByProviderName usecase.GetProductsByPr
 	return func(ctx *fiber.Ctx) error {
 
 		providerName := ctx.Params("provider_name")
-		products := getProductsByProviderName.Execute(providerName)
+		products, err := getProductsByProviderName.Execute(providerName)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Message)
+		}
 		var response []model.ProductResponse
 		for _, product := range products {
 			productResponse := model.ProductResponse{}
@@ -40,8 +46,10 @@ func CreateProduct(createProductUseCase usecase.CreateProduct) fiber.Handler {
 			return err
 		}
 
-		createProductUseCase.Execute(p.ToProduct())
-
+		productError := createProductUseCase.Execute(p.ToProduct())
+		if productError != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, productError.Message)
+		}
 		return ctx.SendStatus(fiber.StatusCreated)
 	}
 }

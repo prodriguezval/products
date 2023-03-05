@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/prodriguezval/delicaria_products/products/domain/entity"
+	domainError "github.com/prodriguezval/delicaria_products/products/domain/err"
 	"github.com/prodriguezval/delicaria_products/products/domain/provider"
 	"github.com/prodriguezval/delicaria_products/products/domain/provider/model"
 	"golang.org/x/oauth2/google"
@@ -23,8 +24,11 @@ func NewSheetProductProvider() provider.ProductProvider {
 	return GoogleSheetProductProvider{}
 }
 
-func (p GoogleSheetProductProvider) GetByProviderName(providerName string) []model.ProductProviderResponse {
-	allProducts := p.GetAll()
+func (p GoogleSheetProductProvider) GetByProviderName(providerName string) ([]model.ProductProviderResponse, *domainError.ProductProviderError) {
+	allProducts, err := p.GetAll()
+	if err != nil {
+		return nil, domainError.NewProductProviderError("Error getting the rows from the sheet", err)
+	}
 	var response []model.ProductProviderResponse
 
 	for _, product := range allProducts {
@@ -34,19 +38,19 @@ func (p GoogleSheetProductProvider) GetByProviderName(providerName string) []mod
 		response = append(response, product)
 	}
 
-	return response
+	return response, nil
 }
 
-func (p GoogleSheetProductProvider) GetAll() []model.ProductProviderResponse {
+func (p GoogleSheetProductProvider) GetAll() ([]model.ProductProviderResponse, *domainError.ProductProviderError) {
 	var products []model.ProductProviderResponse
 	_, resp, err := p.getDataFromSpreadSheet(spreadsheetId, sheetName)
 	if err != nil {
-		log.Fatalf("Can't read data: %v", err)
+		return nil, domainError.NewProductProviderError("Can't read data from sheet", err)
 	}
 
 	if len(resp) == 0 {
 		log.Printf("Spreadsheet %s No data found on sheet %s", spreadsheetId, sheetName)
-		return products
+		return products, nil
 	}
 
 	for i, row := range resp {
@@ -80,14 +84,14 @@ func (p GoogleSheetProductProvider) GetAll() []model.ProductProviderResponse {
 		)
 	}
 
-	return products
+	return products, nil
 }
 
-func (p GoogleSheetProductProvider) Insert(product entity.Product) {
-	srv, resp, err := p.getDataFromSpreadSheet(spreadsheetId, sheetName)
+func (p GoogleSheetProductProvider) Insert(product entity.Product) *domainError.ProductProviderError {
+	srv, resp, dError := p.getDataFromSpreadSheet(spreadsheetId, sheetName)
 
-	if err != nil {
-		log.Fatalf("Can't read data: %v", err)
+	if dError != nil {
+		return domainError.NewProductProviderError("Can't read data from sheet", dError)
 	}
 	var nextRow int
 	if len(resp) == 0 {
@@ -113,29 +117,34 @@ func (p GoogleSheetProductProvider) Insert(product entity.Product) {
 		Values: values,
 	}
 
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetId, writeRange, data).ValueInputOption("RAW").Do()
+	_, err := srv.Spreadsheets.Values.Update(spreadsheetId, writeRange, data).ValueInputOption("RAW").Do()
 	if err != nil {
-		log.Fatalf("Data can't be written: %v", err)
+		return domainError.NewProductProviderError("Error creating new product on provider", err)
 	}
+	return nil
 }
 
-func (p GoogleSheetProductProvider) getDataFromSpreadSheet(spreadsheetId string, sheetName string) (*sheets.Service, [][]interface{}, error) {
+func (p GoogleSheetProductProvider) getDataFromSpreadSheet(spreadsheetId string, sheetName string) (*sheets.Service, [][]interface{}, *domainError.ProductProviderError) {
 	_, err := google.FindDefaultCredentials(context.Background(), sheets.SpreadsheetsScope)
 	if err != nil {
-		log.Fatalf("Error authenticating with credentials: %v", err)
+		return nil, nil, domainError.NewProductProviderError("can't initialize the provider", err)
 	}
 
 	client, err := google.DefaultClient(context.Background(), sheets.SpreadsheetsScope)
 	if err != nil {
-		log.Fatalf("Error creating GSheet client: %v", err)
+		return nil, nil, domainError.NewProductProviderError("can't initialize the provider client", err)
 	}
 
 	srv, err := sheets.NewService(context.Background(), option.WithHTTPClient(client))
 	if err != nil {
-		log.Fatalf("Error creating service: %v", err)
+		return nil, nil, domainError.NewProductProviderError("can't initialize the provider service", err)
 	}
 
 	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, sheetName).Do()
 
-	return srv, resp.Values, err
+	if err != nil {
+		return nil, nil, domainError.NewProductProviderError("can't get the spreadsheet", err)
+	}
+
+	return srv, resp.Values, nil
 }

@@ -12,7 +12,7 @@ the clean architecture pattern.
 
 ## File Structure
 - src/< domain >: Like product, contains 3 folders:
-    - domain: contains the contracts and entities
+    - domain: contains the contracts errors and entities
     - infrastructure: contains all the external integration implementations, like API's, databases, etc, typically based on a contract in the domain
     - usecase: orchestrate the flow of the data between the outside layer and the entities.
 

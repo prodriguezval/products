@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"github.com/prodriguezval/delicaria_products/products/domain/entity"
+	domainError "github.com/prodriguezval/delicaria_products/products/domain/err"
 	"github.com/prodriguezval/delicaria_products/products/domain/provider"
 )
 
@@ -13,16 +14,19 @@ func NewGetAllProductsUseCase(provider provider.ProductProvider) GetAllProductsU
 	return GetAllProductsUseCase{productProvider: provider}
 }
 
-func (u GetAllProductsUseCase) Execute() []entity.Product {
-	providerResult := u.productProvider.GetAll()
+func (u GetAllProductsUseCase) Execute() ([]entity.Product, *domainError.ProductProviderError) {
+	providerResult, err := u.productProvider.GetAll()
+	if err != nil {
+		return nil, domainError.NewProductProviderError("Error executing Create GetAllProductsUseCase use case", err)
+	}
 	var response []entity.Product
 
 	if len(providerResult) == 0 {
-		return response
+		return response, nil
 	}
 
 	for _, providerProduct := range providerResult {
 		response = append(response, providerProduct.ToProduct())
 	}
-	return response
+	return response, nil
 }
